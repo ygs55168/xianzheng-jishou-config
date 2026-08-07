@@ -10,6 +10,7 @@ import base64
 import json
 import urllib.request
 import urllib.error
+from urllib.parse import quote
 
 REPO_NAME = "xianzheng-jishou-config"
 REPO_DESC = "先正电子寄售取数 - 配置化工具包 | 寄售点/集团分组/开票规则/二维码读入 全配置驱动，自动生成建表取数SQL"
@@ -40,6 +41,14 @@ def api_request(url, token, method="GET", data=None):
 
 def create_repo(token):
     """创建仓库"""
+    # 先检查仓库是否已存在
+    url = f"https://api.github.com/repos/ygs55168/{REPO_NAME}"
+    status, resp = api_request(url, token, "GET")
+    if status == 200:
+        print(f"ℹ️  仓库已存在: {resp['html_url']}")
+        return True
+
+    # 不存在则创建
     url = "https://api.github.com/user/repos"
     data = {
         "name": REPO_NAME,
@@ -53,9 +62,6 @@ def create_repo(token):
     if status == 201:
         print(f"✅ 仓库创建成功: {resp['html_url']}")
         return True
-    elif status == 422 and "already exists" in resp.get("message", ""):
-        print(f"ℹ️  仓库已存在，继续上传文件")
-        return True
     else:
         print(f"❌ 创建仓库失败: {status} - {resp.get('message', '未知错误')}")
         return False
@@ -63,7 +69,8 @@ def create_repo(token):
 
 def get_file_sha(token, path):
     """获取文件的 SHA（用于判断是否已存在）"""
-    url = f"https://api.github.com/repos/ygs55168/{REPO_NAME}/contents/{path}?ref={BRANCH}"
+    encoded_path = quote(path)
+    url = f"https://api.github.com/repos/ygs55168/{REPO_NAME}/contents/{encoded_path}?ref={BRANCH}"
     status, resp = api_request(url, token, "GET")
     if status == 200:
         return resp.get("sha")
@@ -75,7 +82,8 @@ def upload_file(token, local_path, remote_path, commit_msg):
     with open(local_path, "rb") as f:
         content = base64.b64encode(f.read()).decode("utf-8")
 
-    url = f"https://api.github.com/repos/ygs55168/{REPO_NAME}/contents/{remote_path}"
+    encoded_path = quote(remote_path)
+    url = f"https://api.github.com/repos/ygs55168/{REPO_NAME}/contents/{encoded_path}"
     data = {
         "message": commit_msg,
         "content": content,
